@@ -1,3 +1,5 @@
 python-dotenv
 neo4j
 langchain_groq
+pandas
+sentence_transformers

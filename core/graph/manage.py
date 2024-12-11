@@ -7,6 +7,9 @@ async def setup( uri):
         """
         Asynchronous setup for the Neo4j driver.
         """
+
+        load_dotenv(override=True)
+
         driver = AsyncGraphDatabase.driver(
             uri,
             auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))

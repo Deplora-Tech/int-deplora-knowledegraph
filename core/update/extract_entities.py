@@ -146,7 +146,6 @@ async def clean_extracted_entities(data, prompt_context):
 
     # Invoke the LLM with the cleaning prompt
     response = invoke_groq(cleaning_prompt)
-    print(response.content)
 
     try:
         evaluation_result = json.loads(response.content)
