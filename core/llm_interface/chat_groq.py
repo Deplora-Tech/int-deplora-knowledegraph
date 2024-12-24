@@ -1,15 +1,27 @@
-import os
-from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from groq import Groq
 
-load_dotenv()
-groq_api_key = os.getenv('GROQ_API_KEY')
+# Initialize the Groq client
+client = Groq()
 
-llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
 
-def invoke_groq(prompt):
+def invoke_groq(prompt, system_prompt="you are a helpful assistant.", is_json=False):
     """
     Invokes the ChatGroq model with a given prompt.
     """
-    response = llm.invoke(prompt)
-    return response
+    # Use the client to create a chat completion
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        model="llama3-70b-8192",  # Specify the desired model
+        temperature=0,
+        max_tokens=8192,
+        top_p=1,
+        stop=None,
+        stream=False,
+        response_format={"type": "json_object"} if is_json else None,
+    )
+
+    # Return the generated content
+    return chat_completion.choices[0].message.content

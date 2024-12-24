@@ -1,106 +1,80 @@
 import json
 from core.llm_interface.chat_groq import invoke_groq
 
+
 async def extract_entities_and_relationships(prompt):
     """
     Extracts and cleans relevant entities, relationships, and constraints dynamically.
     Filters out meaningless entities such as generic terms or unqualified metrics.
     """
     system_prompt = """
-    You are an intelligent prompt classification and entity extraction engine. Your job is to analyze the user’s input, identify the **type of prompt**, extract relevant **entities**, determine **relationships** between them, and filter out meaningless or generic entities and relationships.
+        You are an intelligent entity extraction engine. Your job is to:
+        1. Analyze the user’s input.
+        2. Identify **only** the named, specific services or solutions (e.g., 'RDS', 'EC2', 'S3', 'GCP', 'Azure', 'Docker', 'Kubernetes', 'EKS', 'ECS', etc.).
+            - **Exclude** constraints or best practices (e.g., 'no downtime', 'enable autoscaling', 'slow queries', 'instance size').
+            - **Exclude** generic terms like 'application', 'service', 'system', 'database', 'queries', etc., unless they are explicitly tied to a specifically named service.
+        3. For each service identified, assign a **meaningful EntityType**:
+            - 'RDS' → 'DatabaseService'
+            - 'EC2' → 'ComputeService'
+            - 'S3' → 'ObjectStorageService'
+            - 'AWS', 'GCP', 'Azure' → 'CloudProvider'
+            - 'Docker' → 'ContainerPlatform'
+            - 'Kubernetes', 'EKS', 'ECS' → 'ContainerOrchestrationPlatform'
+            - If no suitable predefined category exists, use 'OtherService'.
+        4. Determine the **relationship** based on context:
+            - 'positive' if the user wants to deploy, use, enable, or set up the service.
+            - 'negative' if the user wants to avoid, remove, or disable the service.
+        5. Return the result in **JSON** with the following format:
 
-    ### Instructions:
-    1. **Classify the prompt** into one of the following types:
-      - **Deployment Request / Action**: A request to deploy or take an action.
-      - **Error / Issue Reporting**: Reporting a failure, issue, or error.
-      - **Suggestion / Recommendation**: Asking for advice, suggestions, or alternatives.
-      - **Success / Confirmation**: Confirming a successful operation.
-      - **Query / Information Request**: Requesting information or clarification.
-      - **Configuration Change / Update**: Requesting a change or update in configuration.
-
-    2. **Extract Entities and Relationships:**
-      - Identify all **relevant entities** mentioned (e.g., cloud providers, services, regions).
-      - **Exclude generic terms** like "code," "data," "performance," or "information" unless explicitly tied to a meaningful type or specific context (e.g., "API latency performance").
-      - Determine the **relationship** between these entities (e.g., "Deploy to", "Avoid using").
-      - Label each **relationship** as either **positive** or **negative**.
-
-    3. **Filter Meaningless Entities and Relationships:**
-      - Remove entities that are overly generic, ambiguous, or unqualified (e.g., "performance" or "code").
-      - Retain only entities that provide actionable insights, specific details, or meaningful contributions to the context.
-
-    4. **Detect Constraints:**
-      - Identify any positive or negative **constraints** mentioned (e.g., "Enable autoscaling", "Do not use Kubernetes").
-
-    5. **Format your response** as structured JSON:
-
-    {
-      "PromptType": "<DeploymentRequest | Error | Suggestion | Success>",
-      "Entities": {
-        "entity1": {
-          "type": "<EntityType>",
-          "relationship": "<positive | negative>"
-        },
-        "entity2": {
-          "type": "<EntityType>",
-          "relationship": "<positive | negative>"
+        \"\"\"
+        {
+        "Entities": {
+            "serviceName": {
+            "type": "<EntityType>",
+            "relationship": "<positive | negative>"
+            },
+            "serviceName2": {
+            "type": "<EntityType>",
+            "relationship": "<positive | negative>"
+            }
+            ...
         }
-      }
-    }
+        }
+        \"\"\"
 
-    ### Example:
-    User Prompt: "Deploy a React app to AWs. Ensure it is GDPR compliant. Avoid Kubernetes. Use a PostgreSQL database. Notify the team via Slack. Monitor API latency performance with New Relic. Do not use Docker."
+        Example usage:
+        User Prompt: 'Use EC2 and RDS. Do not use Docker.'
+        Expected Response:
+        \"\"\"
+        {
+        "Entities": {
+            "EC2": {
+            "type": "ComputeService",
+            "relationship": "positive"
+            },
+            "RDS": {
+            "type": "DatabaseService",
+            "relationship": "positive"
+            },
+            "Docker": {
+            "type": "ContainerPlatform",
+            "relationship": "negative"
+            }
+        }
+        }
+        \"\"\"
+        
+        Extract and format the relevant information as structured JSON. ONLY INCLUDE THE JSON. NO ADDITIONAL TEXT.
+        """
 
-    Response:
-    {
-      "PromptType": "DeploymentRequest",
-      "Entities": {
-          "React app": {
-              "type": "Application",
-              "relationship": "positive"
-          },
-          "AWs": {
-              "type": "CloudProvider",
-              "relationship": "positive"
-          },
-          "GDPR": {
-              "type": "PrivacyCompliance",
-              "relationship": "positive"
-          },
-          "Kubernetes": {
-              "type": "ContainerPlatform",
-              "relationship": "negative"
-          },
-          "PostgreSQL": {
-              "type": "DatabaseManagementSystem",
-              "relationship": "positive"
-          },
-          "Slack": {
-              "type": "CommunicationTool",
-              "relationship": "positive"
-          },
-          "New Relic": {
-              "type": "PerformanceMonitoringTool",
-              "relationship": "positive"
-          },
-          "Docker": {
-              "type": "ContainerPlatform",
-              "relationship": "negative"
-          }
-      }
-    }
-    """
-    
+
     # Combine the system prompt with the user prompt
-    combined_prompt = f"{system_prompt}\nUser Prompt: {prompt}\nExtract and format the relevant information as structured JSON. ONLY INCLUDE THE JSON. NO ADDITIONAL TEXT."
-    response = invoke_groq(combined_prompt)
-
-    try:
-        extracted_data = json.loads(response.content)
-        return extracted_data
-    except json.JSONDecodeError:
-        print("Error: Failed to parse JSON response.")
-        return None
-
+    response = invoke_groq(prompt=prompt, system_prompt=system_prompt)
+    print(response)
+    
+    extracted_data = json.loads(response)
+    return extracted_data
+    
 
 
 async def clean_extracted_entities(data, prompt_context):
@@ -149,10 +123,11 @@ async def clean_extracted_entities(data, prompt_context):
 
     try:
         evaluation_result = json.loads(response.content)
-        
+
         # Filter out entities based on LLM's evaluation
         cleaned_entities = {
-            key: value for key, value in entities.items()
+            key: value
+            for key, value in entities.items()
             if evaluation_result.get(key, "meaningless") == "meaningful"
         }
 

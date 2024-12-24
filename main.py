@@ -16,20 +16,28 @@ async def main():
     # a = await context_graph.update(username, "Lambda function is returning a throttling error. Adjust the concurrency limit to handle increased requests, optimize code to improve performance, and monitor costs.")
     # print(a)
     
-    filepath = "./entity_extraction_150-gr-70b.csv"
-    df = pd.read_csv(filepath)
+    # filepath = "./entity_extraction_150-gr-70b.csv"
+    # df = pd.read_csv(filepath)
     
-    for index, row in df.iterrows():
-        username = row["User"]
+    # for index, row in df.iterrows():
+    #     username = row["User"]
+    #     project = row["Project"]        
+    #     prompt = row["Prompt"]
+    #     organization = row["Organization"]
+    #     print(prompt)
         
-        if username != "User 3":
-            continue
+    #     try:
+    #         a = await context_graph.update(username, project, organization, prompt)
         
-        prompt = row["Prompt"]
-        print(prompt)
+    #     except Exception as e:
+    #         print(e)
+    #         print("Error in updating context graph")
         
-        await context_graph.add_user(username, "Organization")
-        a = await context_graph.update(username, prompt)
+    #     # if index == 10:
+    #     #     break
+    print("Searching")
+    x = await context_graph.search("User 1", "Project 1", "Org1")
+    print(x)
         
         
     
